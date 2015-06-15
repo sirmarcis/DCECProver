@@ -1,6 +1,6 @@
 ;;;; ShadowProver.lisp
 
-(in-package #:shadowprover)
+(in-package :shadowprover)
 
 
 (defclass proof ()
@@ -174,12 +174,7 @@
 			       ":"
                                (princ-to-string info)))))))
 
-
-
-(defun prove! (Premises Formula &key 
-                                 sortal-fn
-                                  
-                                 (proof-stack nil) (caller nil))
+(defun prove! (Premises Formula &key sortal-fn (proof-stack nil) (caller nil))
   (if (or *debug* *interactive*) 
       (interactive-interface caller))
   (if *debug*  (progn (print Premises) (print Formula)))
@@ -190,16 +185,14 @@
            (add-to-proof-stack proof-stack :FOL Formula (used-premises shadow-ans)) 
        (or
         (if (not (elem Formula *tackled-backwards*)) 
-            (let ()
+            (progn
               (setf *tackled-backwards* (cons Formula *tackled-backwards*))
               (backward Premises Formula sortal-fn proof-stack)))
-        (let () 
+        (progn
           (setf *tackled-backwards* (cons Formula *tackled-backwards*))
           (forward  Premises Formula sortal-fn proof-stack))))))
 
-
-
 (defun run-all-tests ()
-(5am:explain! (5am:run 'shadowprover::shadowprover-dev-tests))
-)
+  (5am:explain! (5am:run 'shadowprover::shadowprover-dev-tests))
+  )
 

@@ -1,6 +1,5 @@
 ;;;; ShadowProver.asd
-
-(asdf:defsystem #:shadowprover
+(asdf:defsystem :shadowprover
   :serial t
   :description "A prover for DCEC, a first-order modal logic."
   :author "Naveen Sundar G."

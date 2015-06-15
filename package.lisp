@@ -13,5 +13,6 @@
   (:export :declare-signature :get-sort :generate))
 
 (defpackage #:shadowprover
-  (:use #:cl #:optima #:sorts #:snark-interface))
+  (:use #:cl #:optima #:sorts #:snark-interface)
+  (:export :prove :prove-dcec :main))
 
