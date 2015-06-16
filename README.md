@@ -32,7 +32,7 @@ Axioms:
 Conclusion:
 [conclusion]"
 
-or can specify a file with the necessary inputst in it. Usage of this is as follows:
+You also can specify a file with the necessary inputs in it. Usage of this is as follows:
 ./shadowprover.exe [file-name] -f
 or
 ./shadowprover.exe [file-name] --file
@@ -48,9 +48,9 @@ Then run (prove-dcec [input-string]) where [input string] is the inputs as you w
 to the DCEC.
 
 TO BUILD IMAGE:
-open sbcl in terminal and run following commands:
+Open sbcl in terminal and run following commands:
 (load (format NIL "~aloader.lisp" (namestring *default-pathname-defaults*)))
-(sb-ext:save-lisp-and-die "shadowprover.exe" :toplevel #'shadowprover:main :executable t)
+(sb-ext:save-lisp-and-die "shadowprover-linux" :toplevel #'shadowprover:main :executable t)
 
 usage example:
 ./shadowprover.exe "Prototypes:

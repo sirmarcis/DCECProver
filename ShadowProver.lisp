@@ -18,6 +18,7 @@
   (snark:declare-sort 'snark::Object)
   (snark:declare-sort 'snark::Fluent)
   (snark:declare-sort 'snark::Agent)
+  (snark:declare-sort 'snark::Boolean)
   (snark:declare-sort 'snark::Moment))
 
 
