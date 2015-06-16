@@ -21,6 +21,8 @@ Every atomic modal formula **m** is assigned a _unique propositional_
  repeat the process from **Step 1**. If the prover succeeds, we return
  true.
 
+## Usage Notes
+
 See Usage example below to see how to run binary executable, where the argument string should be of 
 this format:
 "Prototypes:

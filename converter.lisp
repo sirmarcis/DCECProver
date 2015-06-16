@@ -1,3 +1,9 @@
+;;; Written by: Anders Maraviglia
+;;; MAIN FUNCTION: prove-dcec
+;;; NOTE: Function main was meant to be used as the entry point for a build image,
+;;; and uses command line arguments intrinsically, do not use if working in a lisp
+;;; enviormnent.
+
 (in-package :shadowprover)
 
 (defparameter *test-input-1* "Prototypes:
@@ -32,6 +38,9 @@ forAll([Object x],implies(BigA(s,not_w_obj),implies(isMember(x,s),not_w(x))))
 
 Conclusion:
 forAll([Object x],implies(isMember(x,s),not_w(x)))")
+
+(defparameter *opts* '(("o" :required)
+                       ("h" :none)))
 
 (defvar *dy-sig* NIL)
 
@@ -72,11 +81,7 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 (defun parse-prototype-line (curr-line)
   "called by parse-input-str to parse a single line that contains prototype data, returning a list"
   (let*((input-prototype-arr (space-tokenize curr-line))
-	(output-prototype-arr NIL)
-	(prototype-word "")
-	(prototype NIL)
-	(typedef-p NIL)
-	(word-start-pos 0))
+	(output-prototype-arr NIL))
     (if (equalp (aref input-prototype-arr 0) "typedef") ;; typedef case
 	(progn
 	  (setf (gethash (aref input-prototype-arr 1) *f-to-s-hash*)
@@ -105,10 +110,9 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 	(stat-pos 0)
 	(var-dec-str "")
 	(get-s-exp-str NIL)
-	(curr-list NIL)
 	(list-depth-hash (make-hash-table :size 20 :test #'equal :rehash-size 2))
 	(curr-depth 0))
-    (dotimes (char-elt (length curr-line))
+    (dotimes (char-elt (length curr-line)) ;; loop over every char in line
       (when (gethash (aref curr-line char-elt) *axiom-delimiter-hash*)
 	(setf curr-statement (subseq curr-line stat-pos char-elt))
 	(when (and get-s-exp-str (equalp var-dec-str ""))
@@ -131,7 +135,7 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 			      (append (gethash curr-depth list-depth-hash)
 				      (list (intern (string-upcase curr-statement))))))
 		      (setf (first (last (gethash (- curr-depth 1) list-depth-hash)))
-			    (gethash curr-depth list-depth-hash))
+			    (gethash curr-depth list-depth-hash)) ;; tie back tree to level above
 		      (setf curr-depth (- curr-depth 1)))
 		    (if (equalp (aref curr-line char-elt) #\])
 			(progn
@@ -149,7 +153,7 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
     (first (gethash 0 list-depth-hash))))
 
 (defun parse-input-str (input-str)
-  "called by prove-dcec"
+  "called by prove-dcec, does all the translation from f to s expressions from input-str and finds prototypes, axioms, and conclusions and puts it in shadowprover readable data structures"
   (let*((curr-line "")
 	(line-pos 0)
 	(prototypes-p NIL)
@@ -158,7 +162,6 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 	(curr-prototype NIL)
 	(prototype-arr-list NIL)
 	(axiom-list NIL)
-	(dy-sig-local NIL)
 	(conclusion-list NIL))
     (dotimes (char-elt (length input-str))
       (when (equalp (aref input-str char-elt) #\linefeed) ;; for every line 
@@ -173,7 +176,7 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 		    (progn
 		      (setf axioms-p NIL)
 		      (setf conclusions-p T))
-		    (progn
+		    (progn ;; found one of the three types
 		      (when (and prototypes-p (> (length curr-line) 0))
 			(setf curr-prototype (parse-prototype-line curr-line))
 			(when curr-prototype
@@ -185,40 +188,40 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 			)))))
 	(setf line-pos (+ char-elt 1))))
     (setf curr-line (subseq input-str line-pos))  ;; last line edge case
-    (when (and conclusions-p (> (length curr-line) 0))
+    (when (and conclusions-p (> (length curr-line) 0)) ;; to find conclusion
       (setf conclusion-list (append (list (parse-axioms-line curr-line)) conclusion-list)))
     (list prototype-arr-list axiom-list conclusion-list)))
 ;;(parse-input-str *test-input-1*)
 
-(defun prove-dcec (input-str)
+(defun prove-dcec (input-str &key debug)
+  "called by main, calls parse-input-str to format data to run through shadowprover"
   (destructuring-bind (prototype-arr-list axiom-list conclusion-list) (parse-input-str input-str)
     (setf *dy-sig* prototype-arr-list)
-    (format t "prototype-arr-list[~w]~%" :prototype-arr-list)
-    (format t "axiom-list[~w]~%" axiom-list)
-    (format t "conclusion-list[~w]~%" conclusion-list)
+    (when debug ;; debugging messages
+      (format t "prototype-arr-list[~w]~%" :prototype-arr-list)
+      (format t "axiom-list[~w]~%" axiom-list)
+      (format t "conclusion-list[~w]~%" conclusion-list))
     (pprint (prove axiom-list (first conclusion-list) :signature *dy-sig*))))
 ;;(prove-dcec *test-input-2*)
 
-(defparameter *opts* '(("o" :required)
-                       ("h" :none)))
-
 (defun get-file-contents-str (file-name)
+  "simple function to get the contents of a text file"
   (let*((output-str "")
 	(in (open file-name :if-does-not-exist nil)))
     (when in
       (loop for line = (read-line in nil)
          while line do (setf output-str (format NIL "~a~a~%" output-str line)))
       (close in))
-    output-str))
+    output-str)) ;; returns an empty string of file does not exist
 
 (defun main ()
+  "built to be run as the main function from an image, relies on command line arguments"
   (let*((argv (subseq sb-ext:*posix-argv* 1))
-	(input-str "")
-	(write-to-file NIL))
+	(input-str ""))
     (multiple-value-bind (args opts)
         (getopt:getopt argv *opts*)
       (unless (car argv)
-        (format t "bad args~%"))
+        (format t "bad args[~w]~%" opts))
       (if (> (length argv) 1)
 	  (when (or (equalp (second argv) "-f") (equalp (second argv) "--file"))
 	    (setf input-str (get-file-contents-str (first argv)))
