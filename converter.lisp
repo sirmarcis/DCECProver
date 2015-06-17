@@ -254,7 +254,7 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
       (when (or (equalp (aref input-str char-elt) #\linefeed) (equalp (aref input-str char-elt) #\#)) ;; for every line
 	(when (< line-pos char-elt)
 	  (setf curr-line (subseq input-str line-pos char-elt))
-	  (format t "curr-line[~w]~%" curr-line)
+	 
 	  (if (string= (string-trim break-char-list curr-line) "Prototypes:") ;; begin looking for prototypes
 	      (setf prototypes-p T)
 	      (if (string= (string-trim break-char-list curr-line) "Axioms:") ;; begin looking for axioms
