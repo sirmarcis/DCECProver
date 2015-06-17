@@ -29,10 +29,13 @@ website: http://www.sbcl.org/platform-table.html
 * Quicklisp: Follow the instructions on their website to install.
 
 
-## Usage Notes
+## Running The Prover
 
-See Usage example below to see how to run binary executable, where the argument string should be of 
-this format:
+To run Shadowprover using the standard DCEC input format, simply run the following command wherever
+you put the binary file:
+`./shadowprover-[OS type] [input prototypes, axioms, and conclusion]`
+
+The argument string should be in this format, see the usage example for more details:
 "Prototypes:
 [prototypes]
 Axioms:
@@ -41,28 +44,34 @@ Conclusion:
 [conclusion]"
 
 You also can specify a file with the necessary inputs in it. Usage of this is as follows:
-`./shadowprover.exe [file-name] -f`
+`./shadowprover-[OS type] [file-name] -f`
 or
-`./shadowprover.exe [file-name] --file`
+`./shadowprover-[OS type] [file-name] --file`
 
-TO COMPILE FROM REPL: 
+## Usage Notes
+
+Right now, there are only linux and mac binary executables, with windows not being supported.
+
+* TO COMPILE FROM REPL: 
 Open an sbcl instance within the main DCECProver directory and run the command:
 `(load (format NIL "~aloader.lisp" (namestring *default-pathname-defaults*)))`
 
 The entry point function within shadowprover is: (prove [list of Axioms] [list of conclusions])
 
-To run the converter, make sure converter.lisp (found under the main directory) is loaded, and you
-are working in package :shadowprover by running (in-package :shadowprover).  
-Then run (prove-dcec [input-string]) where [input string] is the inputs as you would provide them 
-to the DCEC.
+* TO RUN WITHIN LISP:
+To run the converter from within an sbcl instance, make sure converter.lisp (found under the main 
+directory) is loaded, and you are working in package :shadowprover by running `(in-package :shadowprover)`.  
+Then run `(prove-dcec [input-string])` where [input string] is the input as you would provide them 
+to the DCEC or the binary executable.
 
-TO BUILD AN IMAGE:
+* TO BUILD AN IMAGE:
 Open sbcl in terminal and run following commands:
 `(load (format NIL "~aloader.lisp" (namestring *default-pathname-defaults*)))`
 `(sb-ext:save-lisp-and-die "shadowprover-linux" :toplevel #'shadowprover:main :executable t)`
 
-Usage example:
-`./shadowprover.exe "Prototypes:
+* Usage example:
+
+./shadowprover-[OS type] "Prototypes:
 typedef Function Object
 typedef Set Object
 Boolean w Object
@@ -74,4 +83,4 @@ exists([Object x] implies(BigV(s,w_obj),and(isMember(x,s),w(x))))
 BigV(s w_obj)
 
 Conclusion:
-exists([Object x] w(x))"`
+exists([Object x] w(x))"
