@@ -33,7 +33,7 @@ website: http://www.sbcl.org/platform-table.html
 
 To run Shadowprover using the standard DCEC input format, simply run the following command wherever
 you put the binary file:
-`./shadowprover-[OS type] [input prototypes, axioms, and conclusion]`
+`./shadowprover-<OS type> <input prototypes, axioms, and conclusion> <[-f] or [-s]>`
 
 The argument string should be in this format, see the usage example for more details:
 "Prototypes:
@@ -43,10 +43,12 @@ Axioms:
 Conclusion:
 [conclusion]"
 
+[-f] specifies to recognize the input as being in f notation, whereas [-s] specifies to 
+recognize the input as s notation.
+
 You also can specify a file with the necessary inputs in it. Usage of this is as follows:
-`./shadowprover-[OS type] [file-name] -f`
-or
-`./shadowprover-[OS type] [file-name] --file`
+`./shadowprover-<OS type> <file-name> <[-f] or [-s]> --file`
+
 
 ## Usage Notes
 
@@ -71,7 +73,7 @@ Open sbcl in terminal and run following commands:
 
 * Usage example:
 
-./shadowprover-[OS type] "Prototypes:
+./shadowprover-<OS type> "Prototypes:
 typedef Function Object
 typedef Set Object
 Boolean w Object
@@ -83,4 +85,11 @@ exists([Object x] implies(BigV(s,w_obj),and(isMember(x,s),w(x))))
 BigV(s w_obj)
 
 Conclusion:
-exists([Object x] w(x))"
+exists([Object x] w(x))" -f
+
+## On Snark...
+
+While woring with Shadowprover, it may become necessary to understand the groundword on which
+it is built, i.e., Snark.  If so, the link to the Snark user guide is below, godspeed:
+
+http://www.ai.sri.com/snark/tutorial/tutorial.html

@@ -1,13 +1,1 @@
-Prototypes:
-typedef Function Object
-typedef Set Object
-Boolean w Object
-Boolean BigV Set Function
-Boolean isMember Object Set
-
-Axioms:
-exists([Object x] implies(BigV(s,w_obj),and(isMember(x,s),w(x))))
-BigV(s w_obj)
-
-Conclusion:
-exists([Object x] w(x))
+Prototypes:# typedef Function Object# typedef Set Object# Boolean w Object# Boolean BigV Set Function# Boolean isMember Object Set# Axioms:# exists([Object x] implies(BigV(s,w_obj),and(isMember(x,s),w(x))))# BigV(s w_obj)# Conclusion:# exists([Object x] w(x))

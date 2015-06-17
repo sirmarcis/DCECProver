@@ -162,12 +162,10 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 	    (progn
 	      (setf (gethash curr-depth list-depth-hash)
 		    (append (gethash curr-depth list-depth-hash)
-			    (list (list (intern "*") (intern (string-upcase (format NIL "?~a" curr-statement)))))))
-	      )
+			    (list (list (intern "*") (intern (string-upcase (format NIL "?~a" curr-statement))))))))
 	    (setf (gethash curr-depth list-depth-hash)
 		  (append (gethash curr-depth list-depth-hash)
-			  (list (intern (string-upcase (format NIL "?~a" curr-statement))))))
-	    )
+			  (list (intern (string-upcase (format NIL "?~a" curr-statement)))))))
 	(setf (gethash curr-depth list-depth-hash)
 	      (append (gethash curr-depth list-depth-hash)
 		      (list (intern (string-upcase curr-statement)))))))
@@ -199,12 +197,10 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 	     
 	(setf (gethash curr-depth list-depth-hash)
 	      (append (gethash curr-depth list-depth-hash)
-		      (list (intern (string-upcase (format NIL "?~a" curr-statement)))))))
-      )
+		      (list (intern (string-upcase (format NIL "?~a" curr-statement))))))))
       (setf (gethash curr-depth list-depth-hash)
 	    (append (gethash curr-depth list-depth-hash)
-		    (list (intern (string-upcase curr-statement))))))
-  )
+		    (list (intern (string-upcase curr-statement)))))))
 
 (defun parse-axioms-line (curr-line special-fun-names-hash)
   "called by parse-input-str to read and translate a line of axioms by building a list tree, where the depth lists are kept track of in a hash table whose keys are list depth"
@@ -250,32 +246,35 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 	(conclusions-p NIL)
 	(curr-prototype NIL)
 	(prototype-arr-list NIL)
+	(break-char-list '(#\Space #\linefeed))
 	(special-fun-names-hash (make-hash-table :size 5 :test #'equalp :rehash-size 2))
 	(axiom-list NIL)
 	(conclusion-list NIL))
     (dotimes (char-elt (length input-str))
-      (when (equalp (aref input-str char-elt) #\linefeed) ;; for every line 
-	(setf curr-line (subseq input-str line-pos char-elt))
-	(if (string= curr-line "Prototypes:") ;; begin looking for prototypes
-	    (setf prototypes-p T)
-	    (if (string= curr-line "Axioms:") ;; begin looking for axioms
-		(progn
-		  (setf prototypes-p NIL)
-		  (setf axioms-p T))
-		(if (string= curr-line "Conclusion:") ;; begin looking for conclusion
-		    (progn
-		      (setf axioms-p NIL)
-		      (setf conclusions-p T))
-		    (progn ;; found one of the three types
-		      (when (and prototypes-p (> (length curr-line) 0))
-			(setf curr-prototype (parse-prototype-line curr-line special-fun-names-hash))
-			(when curr-prototype
-			  (setf prototype-arr-list (append prototype-arr-list (list curr-prototype)))))
-		      (when (and axioms-p (> (length curr-line) 0))
-			(setf axiom-list (append axiom-list (list (parse-axioms-line curr-line special-fun-names-hash)))))
-		      (when (and conclusions-p (> (length curr-line) 0))
-			(setf conclusion-list (append (list (parse-axioms-line curr-line special-fun-names-hash)) conclusion-list)))))))
-	(setf line-pos (+ char-elt 1))))
+      (when (or (equalp (aref input-str char-elt) #\linefeed) (equalp (aref input-str char-elt) #\#)) ;; for every line
+	(when (< line-pos char-elt)
+	  (setf curr-line (subseq input-str line-pos char-elt))
+	  (format t "curr-line[~w]~%" curr-line)
+	  (if (string= (string-trim break-char-list curr-line) "Prototypes:") ;; begin looking for prototypes
+	      (setf prototypes-p T)
+	      (if (string= (string-trim break-char-list curr-line) "Axioms:") ;; begin looking for axioms
+		  (progn
+		    (setf prototypes-p NIL)
+		    (setf axioms-p T))
+		  (if (string= (string-trim break-char-list curr-line) "Conclusion:") ;; begin looking for conclusion
+		      (progn
+			(setf axioms-p NIL)
+			(setf conclusions-p T))
+		      (progn ;; found one of the three types
+			(when (and prototypes-p (> (length curr-line) 0))
+			  (setf curr-prototype (parse-prototype-line curr-line special-fun-names-hash))
+			  (when curr-prototype
+			    (setf prototype-arr-list (append prototype-arr-list (list curr-prototype)))))
+			(when (and axioms-p (> (length curr-line) 0))
+			  (setf axiom-list (append axiom-list (list (parse-axioms-line curr-line special-fun-names-hash)))))
+			(when (and conclusions-p (> (length curr-line) 0))
+			  (setf conclusion-list (append (list (parse-axioms-line curr-line special-fun-names-hash)) conclusion-list)))))))
+	  (setf line-pos (+ char-elt 1)))))
     (setf curr-line (subseq input-str line-pos))  ;; last line edge case
     (when (and conclusions-p (> (length curr-line) 0)) ;; to find conclusion
       (setf conclusion-list (append (list (parse-axioms-line curr-line special-fun-names-hash)) conclusion-list)))
@@ -293,8 +292,9 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 	(format t "axiom-list:~%" )
 	(pprint axiom-list)
 	(format t "~%conclusion-list[~w]~%" conclusion-list))
-      (pprint (setf snark-response (prove axiom-list (first conclusion-list) :signature *dy-sig* :proof-stack T)))
-      snark-response)))
+      (setf snark-response (prove axiom-list (first conclusion-list) :signature *dy-sig* :proof-stack T))
+      (pprint snark-response)
+      (format t "~%"))))
 ;;(prove-dcec *test-input-2*)
 
 (defun get-file-contents-str (file-name)
@@ -308,20 +308,26 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
     output-str)) ;; returns an empty string of file does not exist
 
 (defun main ()
-  "built to be run as the main function from an image, relies on command line arguments"
+  "built to be run as the main function for an image, relies on command line arguments"
   (let*((argv (subseq sb-ext:*posix-argv* 1))
 	(input-str ""))
     (multiple-value-bind (args opts)
         (getopt:getopt argv *opts*)
       (unless (car argv)
         (format t "bad args[~w]~%" opts))
-      (if (> (length argv) 1)
-	  (when (or (equalp (second argv) "-f") (equalp (second argv) "--file"))
+      (when (> (length argv) 2)
+	  (when (equalp (third argv) "--file")
 	    (setf input-str (get-file-contents-str (first argv)))
-	    (if (equalp input-str "")
-		(format t "Error: file[~a] does not exist!~%" (first argv))
-		(progn
-		  (format t "file-contents[~a]~%" input-str)
-		  (prove-dcec input-str))))
-	  (progn
-	    (prove-dcec (first args)))))))
+	    (when (equalp input-str "")
+	      (format t "Error: file[~a] does not exist!~%" (first argv))
+	      (return-from main))))
+      (if (> (length argv) 1)
+	  (if (equalp (second argv) "-f")
+	      (if (equalp input-str "")
+		  (prove-dcec (first args)) ;; truth case
+		  (prove-dcec input-str)) ;; false case
+	      (if (equalp (second argv) "-s")
+		  (progn ;; use read-from-string
+		    (format t "not currently implimented~%")
+		    )
+		  (format t "usage: ./shadowprover-<OSType> <input> [-f or -s] [--file]~%")))))))
