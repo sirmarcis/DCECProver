@@ -50,13 +50,9 @@ or
 
 ## Usage Notes
 
-Right now, there are only linux and mac binary executables, with windows not being supported.
-
 * TO COMPILE FROM REPL: 
 Open an sbcl instance within the main DCECProver directory and run the command:
 `(load (format NIL "~aloader.lisp" (namestring *default-pathname-defaults*)))`
-
-The entry point function within shadowprover is: (prove [list of Axioms] [list of conclusions])
 
 * TO RUN WITHIN LISP:
 To run the converter from within an sbcl instance, make sure converter.lisp (found under the main 
@@ -68,6 +64,10 @@ to the DCEC or the binary executable.
 Open sbcl in terminal and run following commands:
 `(load (format NIL "~aloader.lisp" (namestring *default-pathname-defaults*)))`
 `(sb-ext:save-lisp-and-die "shadowprover-linux" :toplevel #'shadowprover:main :executable t)`
+
+* The entry point function within shadowprover is: (prove [list of Axioms] [list of conclusions])
+
+* Right now, there are only linux and mac binary executables, with windows not being supported.
 
 * Usage example:
 
