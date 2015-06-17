@@ -21,6 +21,14 @@ Every atomic modal formula **m** is assigned a _unique propositional_
  repeat the process from **Step 1**. If the prover succeeds, we return
  true.
 
+## Dependencies 
+
+* SBCL: if you are on linux, just run the command: `sudo apt-get install sbcl`, or if not look at their 
+website: http://www.sbcl.org/platform-table.html
+
+* Quicklisp: Follow the instructions on their website to install.
+
+
 ## Usage Notes
 
 See Usage example below to see how to run binary executable, where the argument string should be of 
@@ -33,27 +41,28 @@ Conclusion:
 [conclusion]"
 
 You also can specify a file with the necessary inputs in it. Usage of this is as follows:
-./shadowprover.exe [file-name] -f
+`./shadowprover.exe [file-name] -f`
 or
-./shadowprover.exe [file-name] --file
+`./shadowprover.exe [file-name] --file`
 
 TO COMPILE FROM REPL: 
-(load (format NIL "~aloader.lisp" (namestring *default-pathname-defaults*)))
+Open an sbcl instance within the main DCECProver directory and run the command:
+`(load (format NIL "~aloader.lisp" (namestring *default-pathname-defaults*)))`
 
-ENTRY POINT: (prove [list of Axioms] [list of conclusions])
+The entry point function within shadowprover is: (prove [list of Axioms] [list of conclusions])
 
 To run the converter, make sure converter.lisp (found under the main directory) is loaded, and you
 are working in package :shadowprover by running (in-package :shadowprover).  
 Then run (prove-dcec [input-string]) where [input string] is the inputs as you would provide them 
 to the DCEC.
 
-TO BUILD IMAGE:
+TO BUILD AN IMAGE:
 Open sbcl in terminal and run following commands:
-(load (format NIL "~aloader.lisp" (namestring *default-pathname-defaults*)))
-(sb-ext:save-lisp-and-die "shadowprover-linux" :toplevel #'shadowprover:main :executable t)
+`(load (format NIL "~aloader.lisp" (namestring *default-pathname-defaults*)))`
+`(sb-ext:save-lisp-and-die "shadowprover-linux" :toplevel #'shadowprover:main :executable t)`
 
-usage example:
-./shadowprover.exe "Prototypes:
+Usage example:
+`./shadowprover.exe "Prototypes:
 typedef Function Object
 typedef Set Object
 Boolean w Object
@@ -65,4 +74,4 @@ exists([Object x] implies(BigV(s,w_obj),and(isMember(x,s),w(x))))
 BigV(s w_obj)
 
 Conclusion:
-exists([Object x] w(x))"
+exists([Object x] w(x))"`

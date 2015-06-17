@@ -52,6 +52,7 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 (setf (gethash "Fluent" *f-to-s-hash*) "fluent")
 (setf (gethash "Moment" *f-to-s-hash*) "moment")
 (setf (gethash "Boolean" *f-to-s-hash*) "boolean")
+(setf (gethash "C" *f-to-s-hash*) "common")
 
 
 (defvar *axiom-delimiter-hash* NIL)
@@ -116,7 +117,7 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 
 (defun forall-case (line-str forall-var-hash)
   (let*((curr-var-str "")
-	(curr-obj-str "")
+	(curr-obj-str "Object")
 	(var-start-pos 0)
 	(var-list NIL))
     (dotimes (char-elt (length line-str))
@@ -132,10 +133,78 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 		  (setf var-list (append var-list (list (list
 							 (intern (string-upcase (format NIL "?~A" curr-var-str)))
 							 (intern (string-upcase (gethash curr-obj-str *f-to-s-hash*))))))))
-	      (setf curr-obj-str ""))
+	      (setf curr-obj-str "Object"))
 	    (unless (equalp curr-var-str "")
 	      (setf curr-obj-str curr-var-str)))))
     var-list))
+
+(defun new-s-exp-case (curr-statement special-fun-names-hash curr-depth list-depth-hash forall-p char-elt)
+  "called by parse-axioms-line"
+  (if (gethash (string-upcase curr-statement) special-fun-names-hash)
+      (setf (gethash curr-depth list-depth-hash)
+	    (append (gethash curr-depth list-depth-hash)
+		    (list (list (gethash (string-upcase curr-statement) special-fun-names-hash)))))
+      (setf (gethash curr-depth list-depth-hash)
+	    (append (gethash curr-depth list-depth-hash)
+		    (list (list (intern (string-upcase curr-statement)))))))
+  (setf (gethash (+ curr-depth 1) list-depth-hash)
+	(first (last (gethash curr-depth list-depth-hash))))
+  (when (equalp (string-upcase curr-statement) "FORALL")
+    (setf forall-p char-elt))
+  (incf curr-depth)
+  (list curr-depth forall-p))
+
+(defun end-s-exp-case (curr-statement curr-depth list-depth-hash forall-var-hash)
+  "called by parse-axioms-line"
+  (unless (equalp curr-statement "")
+    (if (gethash curr-statement forall-var-hash)
+	(if (find-symbol (string-upcase (first (gethash curr-depth list-depth-hash))) 'snark-lisp)
+	    (progn
+	      (setf (gethash curr-depth list-depth-hash)
+		    (append (gethash curr-depth list-depth-hash)
+			    (list (list (intern "*") (intern (string-upcase (format NIL "?~a" curr-statement)))))))
+	      )
+	    (setf (gethash curr-depth list-depth-hash)
+		  (append (gethash curr-depth list-depth-hash)
+			  (list (intern (string-upcase (format NIL "?~a" curr-statement))))))
+	    )
+	(setf (gethash curr-depth list-depth-hash)
+	      (append (gethash curr-depth list-depth-hash)
+		      (list (intern (string-upcase curr-statement)))))))
+  (setf (first (last (gethash (- curr-depth 1) list-depth-hash)))
+	(gethash curr-depth list-depth-hash)) ;; tie back tree to level above
+  (setf curr-depth (- curr-depth 1))
+  curr-depth)
+
+(defun end-var-dec-case (curr-statement curr-depth list-depth-hash forall-var-hash var-dec-str char-elt curr-line forall-p)
+  "called by parse-axioms-line"
+  (if forall-p
+      (progn
+	(setf (gethash curr-depth list-depth-hash)
+	      (append
+	       (gethash curr-depth list-depth-hash)
+	       (list (forall-case (subseq curr-line forall-p (+ char-elt 1)) forall-var-hash )))))
+      (setf (gethash curr-depth list-depth-hash)
+	    (append
+	     (gethash curr-depth list-depth-hash)
+	     (list (list (intern (string-upcase (format NIL "?~a" curr-statement))) (intern (string-upcase var-dec-str))))))))
+
+(defun simple-var-case (curr-statement forall-var-hash curr-depth list-depth-hash)
+  (if (gethash curr-statement forall-var-hash)
+      (progn
+	(if (find-symbol (string-upcase (first (gethash curr-depth list-depth-hash))) 'snark-lisp)
+	    (setf (gethash curr-depth list-depth-hash)
+		  (append (gethash curr-depth list-depth-hash)
+			  (list (list (intern "*") (intern (string-upcase (format NIL "?~a" curr-statement)))))))
+	     
+	(setf (gethash curr-depth list-depth-hash)
+	      (append (gethash curr-depth list-depth-hash)
+		      (list (intern (string-upcase (format NIL "?~a" curr-statement)))))))
+      )
+      (setf (gethash curr-depth list-depth-hash)
+	    (append (gethash curr-depth list-depth-hash)
+		    (list (intern (string-upcase curr-statement))))))
+  )
 
 (defun parse-axioms-line (curr-line special-fun-names-hash)
   "called by parse-input-str to read and translate a line of axioms by building a list tree, where the depth lists are kept track of in a hash table whose keys are list depth"
@@ -153,58 +222,22 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 	(when (and get-s-exp-str (equalp var-dec-str ""))
 	  (setf var-dec-str (gethash curr-statement *f-to-s-hash*)))
 	(if (equalp (aref curr-line char-elt) #\() ;; branch tree when open paren
-	    (progn
-	      (if (gethash (string-upcase curr-statement) special-fun-names-hash)
-		  (setf (gethash curr-depth list-depth-hash)
-			(append (gethash curr-depth list-depth-hash)
-				(list (list (gethash (string-upcase curr-statement) special-fun-names-hash)))))
-		  (setf (gethash curr-depth list-depth-hash)
-			(append (gethash curr-depth list-depth-hash)
-				(list (list (intern (string-upcase curr-statement)))))))
-	      (setf (gethash (+ curr-depth 1) list-depth-hash)
-		    (first (last (gethash curr-depth list-depth-hash))))
-	      (when (equalp (string-upcase curr-statement) "FORALL")
-		(setf forall-p char-elt))
-	      (incf curr-depth))
+	    (let*((new-s-list (new-s-exp-case curr-statement special-fun-names-hash curr-depth list-depth-hash forall-p char-elt)))
+	      (setf curr-depth (first new-s-list))
+	      (setf forall-p (second new-s-list)))
 	    (if (equalp (aref curr-line char-elt) #\[)
 		(progn
 		  (setf forall-p char-elt)
 		  (setf get-s-exp-str T))
 		(if (equalp (aref curr-line char-elt) #\));; go back when close paren
-		    (progn
-		      (unless (equalp curr-statement "")
-			(if (gethash curr-statement forall-var-hash)
-			    (setf (gethash curr-depth list-depth-hash)
-				  (append (gethash curr-depth list-depth-hash)
-					  (list (intern (string-upcase (format NIL "?~a" curr-statement))))))		    
-			    (setf (gethash curr-depth list-depth-hash)
-				  (append (gethash curr-depth list-depth-hash)
-					  (list (intern (string-upcase curr-statement)))))))
-		      (setf (first (last (gethash (- curr-depth 1) list-depth-hash)))
-			    (gethash curr-depth list-depth-hash)) ;; tie back tree to level above
-		      (setf curr-depth (- curr-depth 1)))
+		    (setf curr-depth (end-s-exp-case curr-statement curr-depth list-depth-hash forall-var-hash))
 		    (if (equalp (aref curr-line char-elt) #\])
 			(progn
-			  (if forall-p
-			      (progn
-				(setf (gethash curr-depth list-depth-hash)
-				      (append
-				       (gethash curr-depth list-depth-hash)
-				       (list (forall-case (subseq curr-line forall-p (+ char-elt 1)) forall-var-hash )))))
-			      (setf (gethash curr-depth list-depth-hash)
-				    (append
-				     (gethash curr-depth list-depth-hash)
-				     (list (list (intern (string-upcase (format NIL "?~a" curr-statement))) (intern (string-upcase var-dec-str)))))))
+			  (end-var-dec-case curr-statement curr-depth list-depth-hash forall-var-hash var-dec-str char-elt curr-line forall-p)
 			  (setf var-dec-str "")
-			  (setf get-s-exp-str NIL))
+			  (setf get-s-exp-str NIL) )
 			(unless (or (equalp curr-statement  "") get-s-exp-str)
-			  (if (gethash curr-statement forall-var-hash)
-			      (setf (gethash curr-depth list-depth-hash)
-				    (append (gethash curr-depth list-depth-hash)
-					    (list (intern (string-upcase (format NIL "?~a" curr-statement))))))		    
-			      (setf (gethash curr-depth list-depth-hash)
-				    (append (gethash curr-depth list-depth-hash)
-					    (list (intern (string-upcase curr-statement)))))))))))
+			  (simple-var-case curr-statement forall-var-hash curr-depth list-depth-hash))))))
 	(setf stat-pos (+ char-elt 1))))
     (first (gethash 0 list-depth-hash))))
 
@@ -251,14 +284,17 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 
 (defun prove-dcec (input-str &key debug)
   "called by main, calls parse-input-str to format data to run through shadowprover"
-  (destructuring-bind (prototype-arr-list axiom-list conclusion-list) (parse-input-str input-str)
-    (setf *dy-sig* prototype-arr-list) 
-    (when debug ;; debugging messages
-      (format t "prototype-arr-list[~w]~%" prototype-arr-list)
-      (format t "axiom-list:~%" )
-      (pprint axiom-list)
-      (format t "conclusion-list[~w]~%" conclusion-list))
-    (pprint (prove axiom-list (first conclusion-list) :signature *dy-sig*))))
+  (let*((snark-response NIL))
+    (destructuring-bind (prototype-arr-list axiom-list conclusion-list) (parse-input-str input-str)
+      (setf prototype-arr-list (append (list '(:name holds! :output boolean :inputs obj)) prototype-arr-list))
+      (setf *dy-sig* prototype-arr-list) 
+      (when debug ;; debugging messages
+	(format t "prototype-arr-list[~w]~%" prototype-arr-list)
+	(format t "axiom-list:~%" )
+	(pprint axiom-list)
+	(format t "~%conclusion-list[~w]~%" conclusion-list))
+      (pprint (setf snark-response (prove axiom-list (first conclusion-list) :signature *dy-sig* :proof-stack T)))
+      snark-response)))
 ;;(prove-dcec *test-input-2*)
 
 (defun get-file-contents-str (file-name)
