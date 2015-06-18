@@ -48,11 +48,13 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 (setf *f-to-s-hash* (make-hash-table :size 10 :test #'equal :rehash-size 2))
 (setf (gethash "Object" *f-to-s-hash*) "obj")
 (setf (gethash "Agent" *f-to-s-hash*) "agent")
+(setf (gethash "Action" *f-to-s-hash*) "action")
 (setf (gethash "Common" *f-to-s-hash*) "C")
 (setf (gethash "Fluent" *f-to-s-hash*) "fluent")
 (setf (gethash "Moment" *f-to-s-hash*) "moment")
 (setf (gethash "Boolean" *f-to-s-hash*) "boolean")
 (setf (gethash "C" *f-to-s-hash*) "common")
+(setf (gethash "K" *f-to-s-hash*) "Knows")
 
 
 (defvar *axiom-delimiter-hash* NIL)
@@ -80,7 +82,7 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
     (setf output-arr (make-array (length output-list) :initial-contents (reverse output-list)))
     output-arr))
 
-(defun parse-prototype-line (curr-line special-fun-names-hash)
+(defun parse-prototype-line (curr-line special-fun-names-hash all-fun-hash)
   "called by parse-input-str to parse a single line that contains prototype data, returning a list"
   (let*((input-prototype-arr (space-tokenize curr-line))
 	(output-prototype-arr NIL))
@@ -89,20 +91,20 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 	  (setf (gethash (aref input-prototype-arr 1) *f-to-s-hash*)
 		(gethash (aref input-prototype-arr 2) *f-to-s-hash*)) ;; map an object subtype to its s recognisable supertype
 	  (return-from parse-prototype-line))
-	(progn ;; return type case
+	(progn ;; must define either a variable or a function (mostly the latter here)
 	  (if (find-symbol (string-upcase (aref input-prototype-arr 1)) 'snark-lisp)
 	      (progn
 		(setf (gethash (string-upcase (aref input-prototype-arr 1)) special-fun-names-hash)
 		      (intern (format NIL "~a!" (string-upcase (aref input-prototype-arr 1)))))
 		(setf output-prototype-arr (append output-prototype-arr
-						   (list :name (intern (format NIL "~a!" (string-upcase (aref input-prototype-arr 1))))))))
+						   (list (intern (format NIL "~a!" (string-upcase (aref input-prototype-arr 1))))))))
 	      (progn
 		(setf (gethash (string-upcase (aref input-prototype-arr 1)) special-fun-names-hash)
 		      (intern (string-upcase (aref input-prototype-arr 1))))
 		(setf output-prototype-arr (append output-prototype-arr
-						 (list :name (intern (string-upcase (aref input-prototype-arr 1)))))))) ;; map name
+						 (list (intern (string-upcase (aref input-prototype-arr 1)))))))) ;; map name
 	  (setf output-prototype-arr (append output-prototype-arr
-		(list :output (intern (string-upcase (aref input-prototype-arr 0)))))) ;; map output
+		(list (intern (string-upcase (gethash (aref input-prototype-arr 0) *f-to-s-hash*)))))) ;; map output
 	  (let*((inputs-list NIL)) ;; map one or more inputs to a single list
 	    (dotimes (char-elt (- (length input-prototype-arr) 2))
 	      (setf inputs-list
@@ -110,10 +112,35 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 		     (list
 		      (intern (string-upcase (gethash (aref input-prototype-arr (+ char-elt 2)) *f-to-s-hash*))))
 		     inputs-list))) ;; map f inputs to s recognisable names
+	    (setf (gethash (intern (string-upcase (first output-prototype-arr))) all-fun-hash) (reverse inputs-list))
 	    (if (> (length inputs-list) 1)
-		(setf output-prototype-arr (append output-prototype-arr (list :inputs (reverse inputs-list))))
-		(setf output-prototype-arr (append output-prototype-arr (list :inputs) (reverse inputs-list)))))))
+		(setf output-prototype-arr (append output-prototype-arr (list (reverse inputs-list))))
+		(setf output-prototype-arr (append output-prototype-arr (reverse inputs-list)))))))
     output-prototype-arr))
+
+(defun get-var-type (curr-var all-fun-hash curr-depth list-depth-hash proto-var-hash local-var-p)
+  (let*((curr-s-exp (gethash curr-depth list-depth-hash))
+	(var-index (- (length curr-s-exp) 1))
+	(new-proto-entry NIL)
+	(curr-var-symbol (intern (string-upcase curr-var)))
+	)
+    (if local-var-p
+	(let*((depth-reverse (- curr-depth 1)))
+	  (dotimes (depth-elt curr-depth)
+	    (setf depth-reverse (- depth-reverse 1))
+	    (when (or (equalp (first (gethash depth-reverse list-depth-hash)) 'FORALL) (equalp (first (gethash depth-reverse list-depth-hash)) 'EXISTS))
+	      (dolist (var-dec-list (second (gethash depth-reverse list-depth-hash)))
+		(when (and (equalp (first var-dec-list) curr-var-symbol) (nth var-index (gethash (first curr-s-exp) all-fun-hash)))
+		  (setf (second var-dec-list) (nth var-index (gethash (first curr-s-exp) all-fun-hash)))
+		  ))
+	      (return-from get-var-type))))
+	(unless (gethash curr-var-symbol proto-var-hash) ;;only add for unique variables
+	  (if (nth var-index (gethash (first curr-s-exp) all-fun-hash))
+	      (setf new-proto-entry (list curr-var-symbol (nth var-index (gethash (first curr-s-exp) all-fun-hash)) NIL))
+	      (setf new-proto-entry (list curr-var-symbol 'OBJ NIL)))
+	  (setf (gethash curr-var-symbol proto-var-hash) new-proto-entry)
+	  ))
+    ))
 
 (defun forall-case (line-str forall-var-hash)
   (let*((curr-var-str "")
@@ -138,15 +165,18 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 	      (setf curr-obj-str curr-var-str)))))
     var-list))
 
+(defun add-statement-to-s-exp (curr-statement curr-depth list-depth-hash)
+  (setf (gethash curr-depth list-depth-hash)
+	(append (gethash curr-depth list-depth-hash)
+		(list curr-statement))))
+
 (defun new-s-exp-case (curr-statement special-fun-names-hash curr-depth list-depth-hash forall-p char-elt)
   "called by parse-axioms-line"
   (if (gethash (string-upcase curr-statement) special-fun-names-hash)
-      (setf (gethash curr-depth list-depth-hash)
-	    (append (gethash curr-depth list-depth-hash)
-		    (list (list (gethash (string-upcase curr-statement) special-fun-names-hash)))))
-      (setf (gethash curr-depth list-depth-hash)
-	    (append (gethash curr-depth list-depth-hash)
-		    (list (list (intern (string-upcase curr-statement)))))))
+      (add-statement-to-s-exp (list (gethash (string-upcase curr-statement) special-fun-names-hash)) curr-depth list-depth-hash)
+      (if (gethash curr-statement *f-to-s-hash*)
+	  (add-statement-to-s-exp (list (intern (string-upcase (gethash curr-statement *f-to-s-hash*)))) curr-depth list-depth-hash)
+	  (add-statement-to-s-exp (list (intern (string-upcase curr-statement))) curr-depth list-depth-hash)))
   (setf (gethash (+ curr-depth 1) list-depth-hash)
 	(first (last (gethash curr-depth list-depth-hash))))
   (when (equalp (string-upcase curr-statement) "FORALL")
@@ -154,21 +184,22 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
   (incf curr-depth)
   (list curr-depth forall-p))
 
-(defun end-s-exp-case (curr-statement curr-depth list-depth-hash forall-var-hash)
+(defun end-s-exp-case (curr-statement curr-depth list-depth-hash forall-var-hash all-fun-hash proto-var-hash)
   "called by parse-axioms-line"
   (unless (equalp curr-statement "")
     (if (gethash curr-statement forall-var-hash)
 	(if (find-symbol (string-upcase (first (gethash curr-depth list-depth-hash))) 'snark-lisp)
 	    (progn
-	      (setf (gethash curr-depth list-depth-hash)
-		    (append (gethash curr-depth list-depth-hash)
-			    (list (list (intern "*") (intern (string-upcase (format NIL "?~a" curr-statement))))))))
-	    (setf (gethash curr-depth list-depth-hash)
-		  (append (gethash curr-depth list-depth-hash)
-			  (list (intern (string-upcase (format NIL "?~a" curr-statement)))))))
-	(setf (gethash curr-depth list-depth-hash)
-	      (append (gethash curr-depth list-depth-hash)
-		      (list (intern (string-upcase curr-statement)))))))
+	      (add-statement-to-s-exp (list (intern "HOLDS!") (intern (string-upcase (format NIL "?~a" curr-statement)))) curr-depth list-depth-hash)
+	      )
+	    (progn
+	      (get-var-type (format NIL "?~a" curr-statement) all-fun-hash curr-depth list-depth-hash proto-var-hash T)
+	      (add-statement-to-s-exp (intern (string-upcase (format NIL "?~a" curr-statement))) curr-depth list-depth-hash)
+	      ))
+	(progn
+	  (get-var-type curr-statement all-fun-hash curr-depth list-depth-hash proto-var-hash NIL)
+	  (add-statement-to-s-exp (intern (string-upcase curr-statement)) curr-depth list-depth-hash)
+	  )))
   (setf (first (last (gethash (- curr-depth 1) list-depth-hash)))
 	(gethash curr-depth list-depth-hash)) ;; tie back tree to level above
   (setf curr-depth (- curr-depth 1))
@@ -177,32 +208,24 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 (defun end-var-dec-case (curr-statement curr-depth list-depth-hash forall-var-hash var-dec-str char-elt curr-line forall-p)
   "called by parse-axioms-line"
   (if forall-p
-      (progn
-	(setf (gethash curr-depth list-depth-hash)
-	      (append
-	       (gethash curr-depth list-depth-hash)
-	       (list (forall-case (subseq curr-line forall-p (+ char-elt 1)) forall-var-hash )))))
-      (setf (gethash curr-depth list-depth-hash)
-	    (append
-	     (gethash curr-depth list-depth-hash)
-	     (list (list (intern (string-upcase (format NIL "?~a" curr-statement))) (intern (string-upcase var-dec-str))))))))
+      (add-statement-to-s-exp (forall-case (subseq curr-line forall-p (+ char-elt 1)) forall-var-hash ) curr-depth list-depth-hash)
+      (add-statement-to-s-exp (list (intern (string-upcase (format NIL "?~a" curr-statement))) (intern (string-upcase var-dec-str))) curr-depth list-depth-hash)
+      ))
 
-(defun simple-var-case (curr-statement forall-var-hash curr-depth list-depth-hash)
+(defun simple-var-case (curr-statement forall-var-hash curr-depth list-depth-hash all-fun-hash proto-var-hash)
   (if (gethash curr-statement forall-var-hash)
       (progn
+	(get-var-type (format NIL "?~a" curr-statement) all-fun-hash curr-depth list-depth-hash proto-var-hash T)
 	(if (find-symbol (string-upcase (first (gethash curr-depth list-depth-hash))) 'snark-lisp)
-	    (setf (gethash curr-depth list-depth-hash)
-		  (append (gethash curr-depth list-depth-hash)
-			  (list (list (intern "*") (intern (string-upcase (format NIL "?~a" curr-statement)))))))
-	     
-	(setf (gethash curr-depth list-depth-hash)
-	      (append (gethash curr-depth list-depth-hash)
-		      (list (intern (string-upcase (format NIL "?~a" curr-statement))))))))
-      (setf (gethash curr-depth list-depth-hash)
-	    (append (gethash curr-depth list-depth-hash)
-		    (list (intern (string-upcase curr-statement)))))))
+	    (add-statement-to-s-exp (list (intern "HOLDS!") (intern (string-upcase (format NIL "?~a" curr-statement)))) curr-depth list-depth-hash)
+	    (add-statement-to-s-exp (intern (string-upcase (format NIL "?~a" curr-statement))) curr-depth list-depth-hash)
+	    ))
+      (progn
+	(get-var-type curr-statement all-fun-hash curr-depth list-depth-hash proto-var-hash NIL)
+	(add-statement-to-s-exp (intern (string-upcase curr-statement)) curr-depth list-depth-hash)
+	)))
 
-(defun parse-axioms-line (curr-line special-fun-names-hash)
+(defun parse-axioms-line (curr-line special-fun-names-hash all-fun-hash proto-var-hash)
   "called by parse-input-str to read and translate a line of axioms by building a list tree, where the depth lists are kept track of in a hash table whose keys are list depth"
   (let*((curr-statement "")
 	(stat-pos 0)
@@ -226,16 +249,21 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 		  (setf forall-p char-elt)
 		  (setf get-s-exp-str T))
 		(if (equalp (aref curr-line char-elt) #\));; go back when close paren
-		    (setf curr-depth (end-s-exp-case curr-statement curr-depth list-depth-hash forall-var-hash))
+		    (setf curr-depth (end-s-exp-case curr-statement curr-depth list-depth-hash forall-var-hash all-fun-hash proto-var-hash))
 		    (if (equalp (aref curr-line char-elt) #\])
 			(progn
 			  (end-var-dec-case curr-statement curr-depth list-depth-hash forall-var-hash var-dec-str char-elt curr-line forall-p)
 			  (setf var-dec-str "")
 			  (setf get-s-exp-str NIL) )
 			(unless (or (equalp curr-statement  "") get-s-exp-str)
-			  (simple-var-case curr-statement forall-var-hash curr-depth list-depth-hash))))))
+			  (simple-var-case curr-statement forall-var-hash curr-depth list-depth-hash all-fun-hash proto-var-hash))))))
 	(setf stat-pos (+ char-elt 1))))
     (first (gethash 0 list-depth-hash))))
+
+(defun add-new-prototypes (proto-var-hash prototype-arr-list)
+  (loop for value being the hash-values of proto-var-hash
+       do (setf prototype-arr-list (append prototype-arr-list (list value))))
+  prototype-arr-list)
 
 (defun parse-input-str (input-str)
   "called by prove-dcec, does all the translation from f to s expressions from input-str and finds prototypes, axioms, and conclusions and puts it in shadowprover readable data structures"
@@ -248,36 +276,39 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
 	(prototype-arr-list NIL)
 	(break-char-list '(#\Space #\linefeed))
 	(special-fun-names-hash (make-hash-table :size 5 :test #'equalp :rehash-size 2))
+	(all-fun-hash (make-hash-table :size 5 :test #'equalp :rehash-size 2))
+	(proto-var-hash (make-hash-table :size 5 :test #'equalp :rehash-size 2))
 	(axiom-list NIL)
 	(conclusion-list NIL))
     (dotimes (char-elt (length input-str))
       (when (or (equalp (aref input-str char-elt) #\linefeed) (equalp (aref input-str char-elt) #\#)) ;; for every line
 	(when (< line-pos char-elt)
-	  (setf curr-line (subseq input-str line-pos char-elt))
+	  (setf curr-line (string-trim break-char-list (subseq input-str line-pos char-elt)))
 	 
-	  (if (string= (string-trim break-char-list curr-line) "Prototypes:") ;; begin looking for prototypes
+	  (if (string=  curr-line "Prototypes:") ;; begin looking for prototypes
 	      (setf prototypes-p T)
-	      (if (string= (string-trim break-char-list curr-line) "Axioms:") ;; begin looking for axioms
+	      (if (string= curr-line "Axioms:") ;; begin looking for axioms
 		  (progn
 		    (setf prototypes-p NIL)
 		    (setf axioms-p T))
-		  (if (string= (string-trim break-char-list curr-line) "Conclusion:") ;; begin looking for conclusion
+		  (if (string= curr-line "Conclusion:") ;; begin looking for conclusion
 		      (progn
 			(setf axioms-p NIL)
 			(setf conclusions-p T))
 		      (progn ;; found one of the three types
 			(when (and prototypes-p (> (length curr-line) 0))
-			  (setf curr-prototype (parse-prototype-line curr-line special-fun-names-hash))
+			  (setf curr-prototype (parse-prototype-line curr-line special-fun-names-hash all-fun-hash))
 			  (when curr-prototype
 			    (setf prototype-arr-list (append prototype-arr-list (list curr-prototype)))))
 			(when (and axioms-p (> (length curr-line) 0))
-			  (setf axiom-list (append axiom-list (list (parse-axioms-line curr-line special-fun-names-hash)))))
+			  (setf axiom-list (append axiom-list (list (parse-axioms-line curr-line special-fun-names-hash all-fun-hash proto-var-hash)))))
 			(when (and conclusions-p (> (length curr-line) 0))
-			  (setf conclusion-list (append (list (parse-axioms-line curr-line special-fun-names-hash)) conclusion-list)))))))
+			  (setf conclusion-list (append (list (parse-axioms-line curr-line special-fun-names-hash all-fun-hash proto-var-hash)) conclusion-list)))))))
 	  (setf line-pos (+ char-elt 1)))))
     (setf curr-line (subseq input-str line-pos))  ;; last line edge case
-    (when (and conclusions-p (> (length curr-line) 0)) ;; to find conclusion
-      (setf conclusion-list (append (list (parse-axioms-line curr-line special-fun-names-hash)) conclusion-list)))
+    (when (and conclusions-p (> (length (string-trim break-char-list curr-line)) 0)) ;; to find conclusion
+      (setf conclusion-list (append (list (parse-axioms-line curr-line special-fun-names-hash all-fun-hash proto-var-hash)) conclusion-list)))
+    (setf prototype-arr-list (add-new-prototypes proto-var-hash prototype-arr-list))
     (list prototype-arr-list axiom-list conclusion-list)))
 ;;(parse-input-str *test-input-1*)
 
@@ -285,14 +316,13 @@ forAll([Object x],implies(isMember(x,s),not_w(x)))")
   "called by main, calls parse-input-str to format data to run through shadowprover"
   (let*((snark-response NIL))
     (destructuring-bind (prototype-arr-list axiom-list conclusion-list) (parse-input-str input-str)
-      (setf prototype-arr-list (append (list '(:name holds! :output boolean :inputs obj)) prototype-arr-list))
-      (setf *dy-sig* prototype-arr-list) 
+      (setf prototype-arr-list (append (list '(holds! boolean obj)) prototype-arr-list))
       (when debug ;; debugging messages
 	(format t "prototype-arr-list[~w]~%" prototype-arr-list)
 	(format t "axiom-list:~%" )
 	(pprint axiom-list)
 	(format t "~%conclusion-list[~w]~%" conclusion-list))
-      (setf snark-response (prove axiom-list (first conclusion-list) :signature *dy-sig* :proof-stack T))
+      (setf snark-response (prove axiom-list (first conclusion-list) :signature prototype-arr-list))
       (pprint snark-response)
       (format t "~%"))))
 ;;(prove-dcec *test-input-2*)
